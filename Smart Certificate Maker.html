@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Professional Certificate Maker v2.0</title>
+    
+    <!-- Google Fonts for professional and script styles -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&family=Lato:wght@400;700&family=Great+Vibes&family=Dancing+Script:wght@700&family=Sacramento&display=swap" rel="stylesheet">
+
+    <!-- External Libraries for QR Code and Image Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* --- Basic Setup & UI --- */
+        :root {
+            --primary-color: #0056b3;
+            --secondary-color: #f4f4f9;
+            --border-color: #ddd;
+            --text-color: #333;
+            --light-text: #666;
+            --shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--secondary-color);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .main-container {
+            display: flex;
+            width: 100%;
+            max-width: 1800px; /* Increased max-width for more space */
+            gap: 30px;
+        }
+
+        .controls-panel {
+            flex: 0 0 450px; /* Wider control panel */
+            background: #fff;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            height: 95vh; /* Make it scrollable */
+            overflow-y: auto;
+        }
+
+        .preview-panel {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .tool-title {
+            text-align: center;
+            color: var(--primary-color);
+            margin-top: 0;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 15px;
+        }
+
+        /* --- Control Group Styling --- */
+        .control-group {
+            margin-bottom: 25px;
+            border: 1px solid #eee;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .control-group h3 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: var(--primary-color);
+            font-size: 1.1em;
+            border-left: 4px solid var(--primary-color);
+            padding-left: 10px;
+        }
+
+        label {
+            display: block;
+            font-weight: bold;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            color: var(--light-text);
+        }
+
+        input[type="text"], input[type="date"], select, input[type="color"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            font-size: 1em;
+            box-sizing: border-box;
+            transition: border-color 0.3s;
+        }
+        input[type="color"] { padding: 5px; height: 45px; }
+        
+        /* --- Slider Control Styling --- */
+        .slider-control {
+            display: grid;
+            grid-template-columns: 1fr 80px 50px;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .slider-control label { margin-bottom: 0; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+        input[type="number"] { width: 100%; padding: 5px; text-align: center; }
+        .pos-control { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+
+        /* --- Certificate Preview Styling --- */
+        .certificate-wrapper {
+            width: 842px; /* A4 aspect ratio (landscape) */
+            height: 595px;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            color: #333;
+            overflow: hidden;
+            background: white; /* Fallback background */
+        }
+        
+        #cert-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
+        }
+        
+        /* New base style for movable elements */
+        .cert-element {
+            position: absolute;
+            z-index: 2;
+            transform: translateX(-50%); /* Center based on element width */
+            text-align: center;
+        }
+        #cert-logo, #cert-qrcode-wrapper {
+            position: absolute;
+            z-index: 3;
+            transform: translate(-50%, -50%); /* Center based on element width AND height */
+        }
+        
+        /* Text elements */
+        #cert-title { font-weight: bold; color: #1a237e; }
+        #cert-subtitle { color: #555; }
+        #cert-recipient { font-family: 'Dancing Script', cursive; color: #c2185b; }
+        #cert-body { line-height: 1.5; padding: 0 50px; box-sizing: border-box; }
+        #cert-date {}
+
+        /* Signatures */
+        .signatures-container {
+            position: absolute;
+            z-index: 2;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+            transform: translateX(-50%);
+        }
+        .signature-item { text-align: center; }
+        .signature-line { border-bottom: 2px solid #555; width: 200px; margin: 0 auto; }
+        .signature-text { font-size: 28px; padding-bottom: 5px; }
+        .signature-title { font-size: 14px; color: #444; }
+
+        /* QR Code */
+        #cert-qrcode-wrapper {
+            padding: 5px;
+            background: white;
+            box-shadow: 0 0 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+
+        <!-- =================================== -->
+        <!-- =========== CONTROLS ============== -->
+        <!-- =================================== -->
+        <div class="controls-panel">
+            <h1 class="tool-title">Certificate Maker 2.0</h1>
+
+            <div class="control-group">
+                <h3>1. Content</h3>
+                <label for="recipientName">Recipient Name</label>
+                <input type="text" id="recipientName" value="Debarjun chakraborty">
+                <label for="courseName">Course / Reason</label>
+                <input type="text" id="courseName" value="Mastering Modern JavaScript">
+                <label for="presentedBy">Presented by</label>
+                <input type="text" id="presentedBy" value="The Code Institute">
+                <label for="issueDate">Date of Issue</label>
+                <input type="date" id="issueDate">
+            </div>
+
+            <div class="control-group">
+                <h3>2. Design & Branding</h3>
+                <label for="bgImageUpload">Background Image</label>
+                <input type="file" id="bgImageUpload" accept="image/*">
+                <label for="logoUpload">Logo Image</label>
+                <input type="file" id="logoUpload" accept="image/*">
+            </div>
+            
+            <div class="control-group">
+                <h3>3. Signatures & QR Code</h3>
+                <label for="sig1Text">Signature 1 Text</label>
+                <input type="text" id="sig1Text" value="John Smith">
+                <label for="sig1Title">Signature 1 Title</label>
+                <input type="text" id="sig1Title" value="Lead Instructor">
+                <label for="sig2Text">Signature 2 Text</label>
+                <input type="text" id="sig2Text" value="Emily White">
+                <label for="sig2Title">Signature 2 Title</label>
+                <input type="text" id="sig2Title" value="Program Director">
+                <label for="sigFontSelect">Signature Font</label>
+                <select id="sigFontSelect">
+                    <option value="'Great Vibes', cursive">Great Vibes</option>
+                    <option value="'Dancing Script', cursive" selected>Dancing Script</option>
+                    <option value="'Sacramento', cursive">Sacramento</option>
+                </select>
+                <label for="qrText">QR Code Link/Text</label>
+                <input type="text" id="qrText" value="https://example.com/verify/12345">
+            </div>
+
+            <!-- NEW ADVANCED CONTROLS -->
+            <div class="control-group">
+                <h3>4. Fine-Tune Layout & Style <button id="resetLayout" style="float: right;">Reset</button></h3>
+                
+                <p><strong>Logo</strong></p>
+                <div class="slider-control"><label>Size</label><input type="range" id="logoSize" min="20" max="250" value="80"><input type="number" id="logoSizeVal" min="20" max="250" value="80"></div>
+                <div class="pos-control">
+                    <div class="slider-control"><label>X Pos</label><input type="range" id="logoX" min="0" max="842" value="421"><input type="number" id="logoXVal" min="0" max="842" value="421"></div>
+                    <div class="slider-control"><label>Y Pos</label><input type="range" id="logoY" min="0" max="595" value="80"><input type="number" id="logoYVal" min="0" max="595" value="80"></div>
+                </div>
+
+                <p><strong>Main Title ("Certificate of...")</strong></p>
+                <div class="slider-control"><label>Font Size</label><input type="range" id="titleSize" min="20" max="80" value="50"><input type="number" id="titleSizeVal" min="20" max="80" value="50"></div>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="titleY" min="0" max="595" value="160"><input type="number" id="titleYVal" min="0" max="595" value="160"></div>
+                
+                <p><strong>Subtitle ("This certificate is...")</strong></p>
+                <div class="slider-control"><label>Font Size</label><input type="range" id="subtitleSize" min="10" max="40" value="20"><input type="number" id="subtitleSizeVal" min="10" max="40" value="20"></div>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="subtitleY" min="0" max="595" value="215"><input type="number" id="subtitleYVal" min="0" max="595" value="215"></div>
+
+                <p><strong>Recipient Name</strong></p>
+                <div class="slider-control"><label>Font Size</label><input type="range" id="recipientSize" min="30" max="100" value="60"><input type="number" id="recipientSizeVal" min="30" max="100" value="60"></div>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="recipientY" min="0" max="595" value="280"><input type="number" id="recipientYVal" min="0" max="595" value="280"></div>
+                <label>Color</label><input type="color" id="recipientColor" value="#c2185b">
+                
+                <p><strong>Body Text ("for successfully...")</strong></p>
+                <div class="slider-control"><label>Font Size</label><input type="range" id="bodySize" min="10" max="30" value="18"><input type="number" id="bodySizeVal" min="10" max="30" value="18"></div>
+                <div class="slider-control"><label>Line Space</label><input type="range" id="bodyLineHeight" min="1" max="3" value="1.6" step="0.1"><input type="number" id="bodyLineHeightVal" min="1" max="3" value="1.6" step="0.1"></div>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="bodyY" min="0" max="595" value="350"><input type="number" id="bodyYVal" min="0" max="595" value="350"></div>
+
+                <p><strong>Date</strong></p>
+                <div class="slider-control"><label>Font Size</label><input type="range" id="dateSize" min="10" max="30" value="16"><input type="number" id="dateSizeVal" min="10" max="30" value="16"></div>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="dateY" min="0" max="595" value="430"><input type="number" id="dateYVal" min="0" max="595" value="430"></div>
+
+                <p><strong>Signatures Block</strong></p>
+                <div class="slider-control"><label>Y Pos</label><input type="range" id="signaturesY" min="0" max="595" value="480"><input type="number" id="signaturesYVal" min="0" max="595" value="480"></div>
+
+                <p><strong>QR Code</strong></p>
+                <div class="slider-control"><label>Size</label><input type="range" id="qrSize" min="20" max="150" value="90"><input type="number" id="qrSizeVal" min="20" max="150" value="90"></div>
+                <div class="pos-control">
+                    <div class="slider-control"><label>X Pos</label><input type="range" id="qrX" min="0" max="842" value="100"><input type="number" id="qrXVal" min="0" max="842" value="100"></div>
+                    <div class="slider-control"><label>Y Pos</label><input type="range" id="qrY" min="0" max="595" value="495"><input type="number" id="qrYVal" min="0" max="595" value="495"></div>
+                </div>
+            </div>
+
+            <div class="control-group">
+                <h3>5. Export</h3>
+                <div class="export-buttons" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                    <button id="downloadPNG" class="btn btn-primary" style="padding:12px; border:0; border-radius:6px; background:var(--primary-color); color:white; cursor:pointer;">Download PNG</button>
+                    <button id="downloadJPG" class="btn btn-secondary" style="padding:12px; border:0; border-radius:6px; background:#6c757d; color:white; cursor:pointer;">Download JPG</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- =================================== -->
+        <!-- =========== PREVIEW =============== -->
+        <!-- =================================== -->
+        <div class="preview-panel">
+            <div id="certificate-preview" class="certificate-wrapper">
+                <img id="cert-bg" src="https://i.imgur.com/e3uD287.jpg" alt="Certificate Background">
+
+                <!-- Dynamic Content -->
+                <img id="cert-logo" src="https://i.imgur.com/T0k9GLv.png" alt="Logo">
+                <h1 id="cert-title" class="cert-element">Certificate of Completion</h1>
+                <p id="cert-subtitle" class="cert-element">This certificate is proudly presented to</p>
+                <h2 id="cert-recipient" class="cert-element">Debarjun chakraborty</h2>
+                <p id="cert-body" class="cert-element">for successfully completing the <b>Mastering Modern JavaScript</b> course presented by The Code Institute.</p>
+                <p id="cert-date" class="cert-element">Issued on: May 21, 2024</p>
+                
+                <div id="signatures-wrapper" class="signatures-container cert-element">
+                    <div class="signature-item">
+                        <div id="cert-sig1-text" class="signature-text">John Smith</div>
+                        <div class="signature-line"></div>
+                        <div id="cert-sig1-title" class="signature-title">Lead Instructor</div>
+                    </div>
+                    <div class="signature-item">
+                        <div id="cert-sig2-text" class="signature-text">Emily White</div>
+                        <div class="signature-line"></div>
+                        <div id="cert-sig2-title" class="signature-title">Program Director</div>
+                    </div>
+                </div>
+
+                <div id="cert-qrcode-wrapper"><div id="cert-qrcode"></div></div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const controls = {};
+        const certElements = {};
+        const inputIds = [
+            'recipientName', 'courseName', 'presentedBy', 'issueDate', 'bgImageUpload', 'logoUpload',
+            'sig1Text', 'sig1Title', 'sig2Text', 'sig2Title', 'sigFontSelect', 'qrText',
+            'logoSize', 'logoX', 'logoY', 'titleSize', 'titleY', 'subtitleSize', 'subtitleY',
+            'recipientSize', 'recipientY', 'recipientColor', 'bodySize', 'bodyLineHeight', 'bodyY', 'dateSize', 'dateY',
+            'signaturesY', 'qrSize', 'qrX', 'qrY'
+        ];
+        inputIds.forEach(id => controls[id] = document.getElementById(id));
+
+        const certElementIds = {
+            wrapper: 'certificate-preview', bg: 'cert-bg', logo: 'cert-logo', title: 'cert-title',
+            subtitle: 'cert-subtitle', recipient: 'cert-recipient', body: 'cert-body', date: 'cert-date',
+            signaturesWrapper: 'signatures-wrapper', sig1Text: 'cert-sig1-text', sig1Title: 'cert-sig1-title',
+            sig2Text: 'cert-sig2-text', sig2Title: 'cert-sig2-title', qrCodeWrapper: 'cert-qrcode-wrapper',
+            qrCode: 'cert-qrcode'
+        };
+        Object.keys(certElementIds).forEach(key => certElements[key] = document.getElementById(certElementIds[key]));
+
+        let qrCodeInstance = null;
+        
+        // --- Main Update Function ---
+        function updateCertificate() {
+            // 1. Update Text Content
+            certElements.recipient.textContent = controls.recipientName.value;
+            certElements.body.innerHTML = `for successfully completing the <b>${controls.courseName.value}</b> course presented by ${controls.presentedBy.value}.`;
+            const date = new Date(controls.issueDate.value);
+            certElements.date.textContent = `Issued on: ${date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`;
+            certElements.sig1Text.textContent = controls.sig1Text.value;
+            certElements.sig1Title.textContent = controls.sig1Title.value;
+            certElements.sig2Text.textContent = controls.sig2Text.value;
+            certElements.sig2Title.textContent = controls.sig2Title.value;
+            certElements.sig1Text.style.fontFamily = controls.sigFontSelect.value;
+            certElements.sig2Text.style.fontFamily = controls.sigFontSelect.value;
+            
+            // 2. Update Styles & Positions from Sliders
+            certElements.logo.style.width = `${controls.logoSize.value}px`;
+            certElements.logo.style.height = `${controls.logoSize.value}px`;
+            certElements.logo.style.left = `${controls.logoX.value}px`;
+            certElements.logo.style.top = `${controls.logoY.value}px`;
+
+            Object.assign(certElements.title.style, { fontSize: `${controls.titleSize.value}px`, top: `${controls.titleY.value}px`, left: '50%' });
+            Object.assign(certElements.subtitle.style, { fontSize: `${controls.subtitleSize.value}px`, top: `${controls.subtitleY.value}px`, left: '50%' });
+            Object.assign(certElements.recipient.style, { fontSize: `${controls.recipientSize.value}px`, top: `${controls.recipientY.value}px`, color: controls.recipientColor.value, left: '50%' });
+            Object.assign(certElements.body.style, { fontSize: `${controls.bodySize.value}px`, lineHeight: controls.bodyLineHeight.value, top: `${controls.bodyY.value}px`, left: '50%' });
+            Object.assign(certElements.date.style, { fontSize: `${controls.dateSize.value}px`, top: `${controls.dateY.value}px`, left: '50%' });
+            Object.assign(certElements.signaturesWrapper.style, { top: `${controls.signaturesY.value}px`, left: '50%' });
+
+            // 3. Update QR Code
+            const qrSize = parseInt(controls.qrSize.value);
+            Object.assign(certElements.qrCodeWrapper.style, { width: `${qrSize}px`, height: `${qrSize}px`, left: `${controls.qrX.value}px`, top: `${controls.qrY.value}px` });
+            generateQRCode(controls.qrText.value, qrSize);
+        }
+
+        function generateQRCode(text, size) {
+            certElements.qrCode.innerHTML = '';
+            if (text) {
+                qrCodeInstance = new QRCode(certElements.qrCode, { text, width: size, height: size, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+            }
+        }
+
+        // --- Event Listeners ---
+        Object.values(controls).forEach(control => control.addEventListener('input', updateCertificate));
+        
+        controls.bgImageUpload.addEventListener('change', e => e.target.files && e.target.files[0] && (certElements.bg.src = URL.createObjectURL(e.target.files[0])));
+        controls.logoUpload.addEventListener('change', e => e.target.files && e.target.files[0] && (certElements.logo.src = URL.createObjectURL(e.target.files[0])));
+
+        // Sync sliders with number inputs
+        document.querySelectorAll('.slider-control').forEach(group => {
+            const slider = group.querySelector('input[type="range"]');
+            const number = group.querySelector('input[type="number"]');
+            if(slider && number) {
+                slider.addEventListener('input', () => number.value = slider.value);
+                number.addEventListener('input', () => slider.value = number.value);
+            }
+        });
+
+        // Download listeners
+        document.getElementById('downloadPNG').addEventListener('click', () => downloadCertificate('png'));
+        document.getElementById('downloadJPG').addEventListener('click', () => downloadCertificate('jpeg'));
+        function downloadCertificate(format) {
+            const filename = `Certificate-${controls.recipientName.value.replace(/\s+/g, '_')}.${format}`;
+            html2canvas(certElements.wrapper, { scale: 3, useCORS: true, backgroundColor: null }).then(canvas => { // Higher scale and transparent bg
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = canvas.toDataURL(`image/${format}`, format === 'jpeg' ? 0.92 : 1.0);
+                link.click();
+            });
+        }
+        
+        // Reset layout
+        document.getElementById('resetLayout').addEventListener('click', () => {
+            document.querySelectorAll('.slider-control input').forEach(input => {
+                input.value = input.defaultValue;
+            });
+            controls.recipientColor.value = '#c2185b';
+            updateCertificate();
+        });
+
+        // --- Initial Setup ---
+        controls.issueDate.value = new Date().toISOString().split('T')[0];
+        updateCertificate(); // Initial render
+    });
+    </script>
+</body>
+</html>
